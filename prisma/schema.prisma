@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Session pour Shopify App
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+// Campagne de discount
+model Campaign {
+  id          String   @id @default(uuid())
+  shop        String   // Shop domain (ex: sneakerzone.myshopify.com)
+  name        String
+  description String?
+
+  // Configuration de la campagne
+  discountType String // "PERCENTAGE" | "FIXED" | "FIXED_PRICE"
+  discountValue Float        // Valeur selon le type
+
+  instock     Boolean @default(false) // Discount actif seulement si en stock
+  tracking    Boolean @default(true)  // Suivre les mises à jour auto de prix
+
+  active      Boolean @default(true)  // Campagne active/inactive
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // Relations
+  products    CampaignProduct[]
+  collections CampaignCollection[]
+  lockedPrices LockedPrice[]
+  jobLogs     JobLog[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shop, active])
+  @@index([shop, startDate, endDate])
+}
+
+// Produits assignés directement à une campagne
+model CampaignProduct {
+  id         String   @id @default(uuid())
+  campaignId String
+  productId  String   // Shopify product ID (gid)
+  variantId  String?  // Shopify variant ID (gid) - optionnel pour cibler une variante
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, productId, variantId])
+  @@index([campaignId])
+  @@index([productId])
+}
+
+// Collections assignées à une campagne
+model CampaignCollection {
+  id           String   @id @default(uuid())
+  campaignId   String
+  collectionId String   // Shopify collection ID (gid)
+
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+
+  @@unique([campaignId, collectionId])
+  @@index([campaignId])
+  @@index([collectionId])
+}
+
+// Prix lockés pour Tracking = false
+model LockedPrice {
+  id         String   @id @default(uuid())
+  shop       String
+  campaignId String
+  productId  String   // Shopify product ID (gid)
+  variantId  String?  // Shopify variant ID (gid)
+  
+  basePrice  Float    // Prix de base au moment du lock
+  lockedPrice Float   // Prix locké (discount appliqué)
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, productId, variantId])
+  @@index([shop, productId])
+  @@index([campaignId])
+}
+
+// Logs des jobs (full resync, etc.)
+model JobLog {
+  id         String   @id @default(uuid())
+  shop       String
+  jobType    String   // "full_resync" | "campaign_update" | "inventory_update"
+  campaignId String?
+
+  status     String   // "running" | "completed" | "failed"
+  message    String?
+  metadata   String?  // JSON string avec données additionnelles
+
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  startedAt  DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([shop, jobType])
+  @@index([status])
+  @@index([startedAt])
+}

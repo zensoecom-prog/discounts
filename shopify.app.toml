@@ -1,0 +1,26 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "1105914d1308d3d9c3ede51dc1c8a88b"
+name = "Sneakerzone Discounts"
+application_url = "https://localhost:3458"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+# Webhooks désactivés pour le développement localhost
+# Les webhooks ne fonctionnent pas avec localhost selon la doc Shopify
+# Réactivez-les pour la production ou avec Cloudflare tunnels
+[webhooks]
+api_version = "2025-10"
+# Pas de subscriptions pour le développement localhost
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,write_products,read_inventory,write_inventory"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ ]
