@@ -2,19 +2,30 @@
 
 client_id = "1105914d1308d3d9c3ede51dc1c8a88b"
 name = "Sneakerzone Discounts"
-application_url = "https://localhost:3458"
+application_url = "https://arline-superheroic-dooly.ngrok-free.dev"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
-# Webhooks désactivés pour le développement localhost
-# Les webhooks ne fonctionnent pas avec localhost selon la doc Shopify
-# Réactivez-les pour la production ou avec Cloudflare tunnels
 [webhooks]
 api_version = "2025-10"
-# Pas de subscriptions pour le développement localhost
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "inventory_levels/update" ]
+  uri = "/webhooks/inventory-levels"
+
+  [[webhooks.subscriptions]]
+  topics = [ "products/update" ]
+  uri = "/webhooks/products-update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -23,4 +34,4 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = ["https://arline-superheroic-dooly.ngrok-free.dev/auth/callback"]

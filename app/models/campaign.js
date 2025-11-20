@@ -76,31 +76,73 @@ export async function deleteCampaign(campaignId) {
  * Ajoute des produits à une campagne
  */
 export async function addProductsToCampaign(campaignId, products) {
-  const data = products.map((p) => ({
-    campaignId,
-    productId: p.productId,
-    variantId: p.variantId || null,
-  }));
-
-  return await prisma.campaignProduct.createMany({
-    data,
-    skipDuplicates: true,
-  });
+  console.log("addProductsToCampaign called with:", { campaignId, products, productsCount: products.length });
+  
+  if (!products || products.length === 0) {
+    console.log("No products to add, returning early");
+    return { count: 0 };
+  }
+  
+  // SQLite ne supporte pas skipDuplicates, donc on utilise create avec gestion d'erreur
+  let createdCount = 0;
+  for (const product of products) {
+    try {
+      await prisma.campaignProduct.create({
+        data: {
+          campaignId,
+          productId: product.productId,
+          variantId: product.variantId || null,
+        },
+      });
+      createdCount++;
+    } catch (error) {
+      // Si c'est une erreur de contrainte unique (doublon), on l'ignore
+      if (error.code === 'P2002') {
+        console.log(`Product ${product.productId} already exists in campaign, skipping`);
+        continue;
+      }
+      // Sinon, on propage l'erreur
+      console.error(`Error creating campaign product for ${product.productId}:`, error);
+      throw error;
+    }
+  }
+  
+  console.log(`addProductsToCampaign completed: ${createdCount} products created`);
+  return { count: createdCount };
 }
 
 /**
  * Ajoute des collections à une campagne
  */
 export async function addCollectionsToCampaign(campaignId, collections) {
-  const data = collections.map((c) => ({
-    campaignId,
-    collectionId: c.collectionId,
-  }));
-
-  return await prisma.campaignCollection.createMany({
-    data,
-    skipDuplicates: true,
-  });
+  if (!collections || collections.length === 0) {
+    return { count: 0 };
+  }
+  
+  // SQLite ne supporte pas skipDuplicates, donc on utilise create avec gestion d'erreur
+  let createdCount = 0;
+  for (const collection of collections) {
+    try {
+      await prisma.campaignCollection.create({
+        data: {
+          campaignId,
+          collectionId: collection.collectionId,
+        },
+      });
+      createdCount++;
+    } catch (error) {
+      // Si c'est une erreur de contrainte unique (doublon), on l'ignore
+      if (error.code === 'P2002') {
+        console.log(`Collection ${collection.collectionId} already exists in campaign, skipping`);
+        continue;
+      }
+      // Sinon, on propage l'erreur
+      console.error(`Error creating campaign collection for ${collection.collectionId}:`, error);
+      throw error;
+    }
+  }
+  
+  return { count: createdCount };
 }
 
 /**

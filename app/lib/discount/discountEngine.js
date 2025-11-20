@@ -52,15 +52,28 @@ export async function getActiveCampaignsForProduct(shop, productId, variantId = 
 /**
  * Calcule le prix final pour un produit en tenant compte de toutes les campagnes applicables
  * Retourne le prix le plus bas parmi toutes les campagnes
+ * 
+ * @param {string} shop - Shop domain
+ * @param {string} productId - Shopify product ID
+ * @param {string} variantId - Shopify variant ID (peut être null)
+ * @param {number} basePrice - Prix de base (prix normal avant toute campagne)
+ * @param {boolean} inventoryAvailable - Si le produit est en stock
+ * @param {string[]} productCollections - IDs des collections du produit
+ * @returns {Promise<{finalPrice: number, shouldLock: Array<{campaignId: string, discountedPrice: number}>}>}
  */
 export async function calculateFinalPrice(shop, productId, variantId, basePrice, inventoryAvailable, productCollections = []) {
   const campaigns = await getActiveCampaignsForProduct(shop, productId, variantId, productCollections);
 
   if (campaigns.length === 0) {
-    return basePrice;
+    return {
+      finalPrice: basePrice,
+      shouldLock: [],
+      shouldRestoreOriginal: true,
+    };
   }
 
   const prices = [];
+  const shouldLock = []; // Campagnes avec Tracking=false qui doivent être lockées
 
   for (const campaign of campaigns) {
     // Vérifier le flag Instock
@@ -82,9 +95,11 @@ export async function calculateFinalPrice(shop, productId, variantId, basePrice,
       });
 
       if (lockedPrice) {
+        // Utiliser le prix locké existant
         prices.push(lockedPrice.lockedPrice);
         continue;
       }
+      // Sinon, on va calculer et lock le prix après
     }
 
     // Calculer le prix discounté
@@ -95,10 +110,27 @@ export async function calculateFinalPrice(shop, productId, variantId, basePrice,
     );
 
     prices.push(discountedPrice);
+
+    // Si Tracking = false et qu'on n'a pas encore de lockedPrice, on doit le créer
+    if (!campaign.tracking) {
+      shouldLock.push({
+        campaignId: campaign.id,
+        discountedPrice,
+      });
+    }
   }
 
-  // Retourner le prix le plus bas (ou le prix de base si aucune campagne applicable)
-  return prices.length > 0 ? Math.min(...prices, basePrice) : basePrice;
+  // Retourner le prix le plus bas parmi toutes les campagnes actives
+  // Si aucune campagne applicable, retourner le prix de base
+  const finalPrice = prices.length > 0 ? Math.min(...prices) : basePrice;
+  // Restaurer le prix original seulement si le prix final n'est pas inférieur au prix de base
+  const shouldRestoreOriginal = finalPrice >= basePrice || prices.length === 0;
+
+  return {
+    finalPrice,
+    shouldLock,
+    shouldRestoreOriginal,
+  };
 }
 
 /**
@@ -130,14 +162,12 @@ export async function lockPrice(shop, campaignId, productId, variantId, basePric
 }
 
 /**
- * Recalcule les prix pour tous les produits affectés par une campagne
+ * Détermine le prix de base (prix normal avant toute campagne)
+ * Le prix de base est le compareAtPrice s'il existe (prix original),
+ * sinon c'est le price actuel (prix normal du produit)
  */
-export async function recalculateCampaignProducts(campaignId) {
-  // Cette fonction sera appelée après une mise à jour de campagne
-  // Elle déclenchera le recalcul des prix pour tous les produits affectés
-  // Pour l'instant, on retourne simplement un succès
-  // L'implémentation complète nécessiterait de récupérer tous les produits affectés
-  // et de mettre à jour leurs prix via l'API Shopify
-  return { success: true };
+export function determineBasePrice(compareAtPrice, currentPrice) {
+  // Si compareAtPrice existe, c'est le prix original (avant discount)
+  // Sinon, le price actuel est le prix normal du produit
+  return compareAtPrice ? parseFloat(compareAtPrice) : parseFloat(currentPrice);
 }
-

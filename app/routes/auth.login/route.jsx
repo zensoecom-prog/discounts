@@ -5,17 +5,29 @@ import { login } from "../../shopify.server";
 import { loginErrorMessage } from "./error.server";
 
 export const loader = async ({ request }) => {
-  const errors = loginErrorMessage(await login(request));
-
+  const loginResult = await login(request);
+  
+  // Si login() retourne une Response (redirection OAuth), on la propage
+  if (loginResult instanceof Response) {
+    return loginResult;
+  }
+  
+  // Sinon, on traite les erreurs
+  const errors = loginErrorMessage(loginResult);
   return { errors };
 };
 
 export const action = async ({ request }) => {
-  const errors = loginErrorMessage(await login(request));
-
-  return {
-    errors,
-  };
+  const loginResult = await login(request);
+  
+  // Si login() retourne une Response (redirection OAuth), on la propage
+  if (loginResult instanceof Response) {
+    return loginResult;
+  }
+  
+  // Sinon, on traite les erreurs
+  const errors = loginErrorMessage(loginResult);
+  return { errors };
 };
 
 export default function Auth() {
